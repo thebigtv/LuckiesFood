@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Luckies Kitchen Dashboard</title>
+<style>
+body{
+font-family:Arial,sans-serif;
+background:#1b1b1b;
+color:white;
+margin:0;
+padding:20px;
+}
+h1{text-align:center;color:#f0a500}
+.container{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:20px;
+}
+.column{
+background:#222;
+padding:15px;
+border-radius:12px;
+}
+.card{
+background:#333;
+padding:15px;
+margin-bottom:15px;
+border-radius:10px;
+}
+.orderid{
+font-size:20px;
+font-weight:bold;
+color:#f0a500;
+}
+.table{
+font-size:24px;
+font-weight:bold;
+margin:10px 0;
+}
+button{
+width:100%;
+padding:12px;
+border:none;
+border-radius:8px;
+font-size:16px;
+font-weight:bold;
+cursor:pointer;
+margin-top:10px;
+}
+.ready{background:#f0a500;color:black}
+.collected{background:#4caf50;color:white}
+.small{font-size:14px;color:#ccc}
+@media(max-width:768px){
+.container{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<h1>LUCKIES KITCHEN DASHBOARD</h1>
+
+<div class="container">
+<div class="column">
+<h2>NEW ORDERS</h2>
+<div id="newOrders"></div>
+</div>
+
+<div class="column">
+<h2>READY FOR COLLECTION</h2>
+<div id="readyOrders"></div>
+</div>
+</div>
+
+<script>
+
+const API_URL="https://script.google.com/macros/s/AKfycbzOTMR-SbXk8SN4Bt4XilbKktpF-i2Wg1J3VEYzS2ccw8hTcRmIH9U5EThVXr83Ae6B0g/exec";
+
+let knownOrders=[];
+
+function buildItems(order){
+
+let items=[];
+
+if(order.margherita>0) items.push(`${order.margherita} × Margherita`);
+if(order.pepperoni>0) items.push(`${order.pepperoni} × Pepperoni`);
+if(order.justMeat>0) items.push(`${order.justMeat} × Just Meat`);
+if(order.garlicBread>0) items.push(`${order.garlicBread} × Garlic Bread`);
+if(order.garlicBreadCheese>0) items.push(`${order.garlicBreadCheese} × Garlic Bread + Cheese`);
+if(order.special>0) items.push(`${order.special} × Special Pizza`);
+
+return items.join("<br>");
+}
+
+async function loadOrders(){
+
+try{
+
+const response=await fetch(API_URL);
+const orders=await response.json();
+
+checkForNewOrders(orders);
+
+const newDiv=document.getElementById("newOrders");
+const readyDiv=document.getElementById("readyOrders");
+
+newDiv.innerHTML="";
+readyDiv.innerHTML="";
+
+orders.forEach(order=>{
+
+const status=(order.status || "NEW").toUpperCase();
+
+const card=document.createElement("div");
+card.className="card";
+
+card.innerHTML=`
+<div class="orderid">${order.orderId || ""}</div>
+<div class="table">TABLE ${order.table}</div>
+<div>${buildItems(order)}</div>
+${order.notes ? `<p><strong>Notes:</strong> ${order.notes}</p>` : ""}
+<div class="small">Created: ${new Date(order.timestamp).toLocaleTimeString()}</div>
+`;
+
+if(status==="READY"){
+
+const btn=document.createElement("button");
+btn.className="collected";
+btn.textContent="COLLECTED";
+btn.onclick=()=>updateStatus("collected",order.rowNumber);
+
+card.appendChild(btn);
+readyDiv.appendChild(card);
+
+}else{
+
+const btn=document.createElement("button");
+btn.className="ready";
+btn.textContent="READY";
+btn.onclick=()=>updateStatus("ready",order.rowNumber);
+
+card.appendChild(btn);
+newDiv.appendChild(card);
+
+}
+
+});
+
+}catch(err){
+console.error(err);
+}
+
+}
+
+async function updateStatus(action,rowNumber){
+
+try{
+
+await fetch(API_URL,{
+method:"POST",
+headers:{"Content-Type":"text/plain"},
+body:JSON.stringify({
+action:action,
+rowNumber:rowNumber
+})
+});
+
+setTimeout(loadOrders,500);
+
+}catch(err){
+console.error(err);
+}
+
+}
+
+function checkForNewOrders(orders){
+
+const ids=orders.map(o=>o.orderId);
+
+if(knownOrders.length>0){
+
+ids.forEach(id=>{
+
+if(id && !knownOrders.includes(id)){
+playNotification();
+}
+
+});
+
+}
+
+knownOrders=ids;
+}
+
+function playNotification(){
+
+try{
+const audio=new Audio("data:audio/wav;base64,UklGRlQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=");
+audio.play();
+}catch(e){}
+
+}
+
+loadOrders();
+setInterval(loadOrders,5000);
+
+</script>
+
+</body>
+</html>
