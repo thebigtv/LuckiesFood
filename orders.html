@@ -1,0 +1,176 @@
+from pathlib import Path
+
+html = r'''<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Luckies Pizza Orders</title>
+<style>
+body{
+font-family:Arial,sans-serif;
+background:#1b1b1b;
+color:#fff;
+margin:0;
+padding:20px;
+max-width:900px;
+margin:auto;
+}
+h1{text-align:center;color:#f0a500;}
+.section{margin:20px 0;}
+.grid{
+display:grid;
+grid-template-columns:repeat(4,1fr);
+gap:10px;
+}
+.table-btn,.qty-btn,.submit-btn,.new-btn{
+padding:14px;
+border:none;
+border-radius:8px;
+cursor:pointer;
+font-size:16px;
+}
+.table-btn{background:#333;color:white;}
+.table-btn.selected{background:#f0a500;color:black;font-weight:bold;}
+.item{
+display:flex;
+justify-content:space-between;
+align-items:center;
+padding:10px 0;
+border-bottom:1px solid #444;
+}
+.qty-controls{display:flex;align-items:center;gap:10px;}
+.qty-btn{background:#f0a500;color:black;font-weight:bold;width:40px;height:40px;}
+.qty{min-width:20px;text-align:center;}
+textarea{
+width:100%;
+min-height:80px;
+padding:10px;
+border-radius:8px;
+border:none;
+}
+.submit-btn,.new-btn{
+background:#f0a500;
+color:black;
+width:100%;
+font-weight:bold;
+margin-top:20px;
+}
+#confirmation{display:none;}
+.card{
+background:#2a2a2a;
+padding:20px;
+border-radius:10px;
+}
+</style>
+</head>
+<body>
+
+<div id="orderForm">
+<h1>LUCKIES PIZZA ORDERS</h1>
+
+<div class="section">
+<h3>Select Table</h3>
+<div class="grid" id="tables"></div>
+</div>
+
+<div class="section">
+<h3>Menu</h3>
+<div id="menu"></div>
+</div>
+
+<div class="section">
+<h3>Extras & Notes</h3>
+<textarea id="notes"></textarea>
+</div>
+
+<button class="submit-btn" onclick="submitOrder()">PLACE ORDER</button>
+</div>
+
+<div id="confirmation">
+<div class="card">
+<h2>✓ Order Submitted</h2>
+<div id="orderSummary"></div>
+<button class="new-btn" onclick="resetOrder()">CREATE NEW ORDER</button>
+</div>
+</div>
+
+<script>
+const API_URL = "https://script.google.com/macros/s/AKfycbzOTMR-SbXk8SN4Bt4XilbKktpF-i2Wg1J3VEYzS2ccw8hTcRmIH9U5EThVXr83Ae6B0g/exec";
+
+const menuItems = [
+["Margherita","margherita"],
+["Pepperoni","pepperoni"],
+["Just Meat","justMeat"],
+["Garlic Bread","garlicBread"],
+["Garlic Bread + Cheese","garlicBreadCheese"],
+["Special Pizza","special"]
+];
+
+let selectedTable = null;
+const quantities = {};
+
+const tableContainer=document.getElementById("tables");
+
+for(let i=1;i<=15;i++){
+ const btn=document.createElement("button");
+ btn.className="table-btn";
+ btn.textContent=i;
+ btn.onclick=()=>selectTable(btn,i);
+ tableContainer.appendChild(btn);
+}
+
+const outside=document.createElement("button");
+outside.className="table-btn";
+outside.textContent="Outside";
+outside.onclick=()=>selectTable(outside,"Outside");
+tableContainer.appendChild(outside);
+
+function selectTable(btn,value){
+ document.querySelectorAll(".table-btn").forEach(b=>b.classList.remove("selected"));
+ btn.classList.add("selected");
+ selectedTable=value;
+}
+
+const menuDiv=document.getElementById("menu");
+
+menuItems.forEach(item=>{
+ quantities[item[1]]=0;
+
+ const row=document.createElement("div");
+ row.className="item";
+
+ row.innerHTML=`
+ <span>${item[0]}</span>
+ <div class="qty-controls">
+ <button class="qty-btn" onclick="changeQty('${item[1]}',-1)">-</button>
+ <span class="qty" id="${item[1]}">0</span>
+ <button class="qty-btn" onclick="changeQty('${item[1]}',1)">+</button>
+ </div>
+ `;
+
+ menuDiv.appendChild(row);
+});
+
+function changeQty(item,val){
+ quantities[item]=Math.max(0,quantities[item]+val);
+ document.getElementById(item).textContent=quantities[item];
+}
+
+async function submitOrder(){
+
+ if(!selectedTable){
+   alert("Please select a table");
+   return;
+ }
+
+ const payload={
+   action:"create",
+   table:selectedTable,
+   ...quantities,
+   notes:document.getElementById("notes").value
+ };
+
+ try{
+
+   const
